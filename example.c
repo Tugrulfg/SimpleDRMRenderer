@@ -4,6 +4,7 @@
 
 #include "Helpers/Renderer_helpers.h"
 #include "Helpers/GL_helpers.h"
+#include "Helpers/Input_helpers.h"
 
 // Vertex shader source code
 static const char *vertexShaderSource =
@@ -35,8 +36,7 @@ static GLint positionAttrib;
 static GLint colorUniform;
 static GLuint vbo = 0;
 
-static int dir = 0;
-static float speed = 0.01;
+static float speed = 0.05;
 
 static void init() {
 //	program = createProgram(vertexShaderSource, fragmentShaderSource);
@@ -55,23 +55,58 @@ static void init() {
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-static void update_vertices() {
-	if (dir) {
-		if (vertices[1] > 1.0)
-			dir = 0;
-		else {
-			vertices[1] += speed;
-			vertices[4] += speed;
-			vertices[7] += speed;
+static void update_vertices(int key) {
+	float diff = 0;
+	switch(key){
+	case 'w':
+		if (vertices[1]+speed < 1.0){
+			diff = speed;
 		}
-	} else {
-		if (vertices[7] < -1.0)
-			dir = 1;
-		else {
-			vertices[1] -= speed;
-			vertices[4] -= speed;
-			vertices[7] -= speed;
+		else{
+			diff = 1.0 - vertices[1];
 		}
+		vertices[1] += diff;
+		vertices[4] += diff;
+		vertices[7] += diff;
+		break;
+	case 's':
+		if (vertices[7]-speed > -1.0){
+			diff = speed;
+		}
+		else{
+			diff = vertices[7] + 1;
+		}
+		vertices[1] -= diff;
+		vertices[4] -= diff;
+		vertices[7] -= diff;
+		break;
+	case 'a':
+		if (vertices[3]-speed > -1.0){
+			diff = speed;
+		}
+		else{
+			diff = vertices[3] + 1;
+		}
+
+		vertices[0] -= diff;
+		vertices[3] -= diff;
+		vertices[6] -= diff;
+		break;
+	case 'd':
+		if (vertices[6]+speed < 1.0){
+			diff = speed;
+		}
+		else{
+			diff = 1 - vertices[6];
+		}
+		vertices[0] += diff;
+		vertices[3] += diff;
+		vertices[6] += diff;
+
+		break;
+	default:
+		printf("Unknown key: %c: %d\n", key, key);
+		return;
 	}
 
 	// Update vertex buffer data
@@ -82,7 +117,6 @@ static void update_vertices() {
 
 static void draw() {
     glViewport(0, 0, renderer_get_width(), renderer_get_height());
-    update_vertices();
     glClearColor(GREEN);
     glClear(GL_COLOR_BUFFER_BIT);
 
@@ -108,15 +142,43 @@ static void cleanup() {
     glDeleteProgram(program);
 }
 
+int keyboard_callback(int key){
+	if(key == 27)
+		return 1;
+
+    update_vertices(key);
+	return 0;
+}
+
+void mouse_callback(int x_move, int y_move, int left, int right, int middle){
+//	printf("Mouse: L=%d R=%d M=%d Move=(%d,%d)\n", left, right, middle, x_move, y_move);
+	if (left) {
+		for (int i = 0; i < 9; i++)
+			vertices[i] *= 1.1;
+	}
+	if (right) {
+		for (int i = 0; i < 9; i++)
+			vertices[i] *= 0.9;
+	}
+
+	// Update vertex buffer data
+	glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+}
+
 int main() {
 	init_renderer(init, draw, cleanup);
+	init_input_handler(keyboard_callback, mouse_callback);
 
 	if (render_loop()) {
 		// Error
 		free_renderer();
+		free_input_handler();
 	} else {
 		// Success
 		free_renderer();
+		free_input_handler();
 	}
 
 	return 0;

@@ -1,10 +1,3 @@
-/*
- * GL_helpers.h
- *
- *  Created on: Aug 11, 2025
- *      Author: tugrul
- */
-
 #ifndef HELPERS_GL_HELPERS_H_
 #define HELPERS_GL_HELPERS_H_
 

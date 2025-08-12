@@ -43,6 +43,7 @@ static struct internal_device{
 
 static struct internal_device *dev = NULL;
 
+extern int process_inputs();
 unsigned int renderer_get_width(){
 	if(!dev){
 		printf("Renderer Error: Renderer haven't been initialized\n");
@@ -410,6 +411,8 @@ int render_loop(){
 
 	printf("Render Loop\n------------------------------------------------------------------------\n");
 	while(1){
+		if(process_inputs())
+			break;
 		dev->draw();
 		if(swap_buffers()){
 			return 1;

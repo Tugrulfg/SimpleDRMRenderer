@@ -1,10 +1,3 @@
-/*
- * render_utils.h
- *
- *  Created on: Mar 8, 2025
- *      Author: tugrul
- */
-
 #ifndef INCLUDE_RENDER_UTILS_H_
 #define INCLUDE_RENDER_UTILS_H_
 

@@ -25,6 +25,7 @@ set(SOURCES
     example.c
     Helpers/Renderer_helpers.c
     Helpers/GL_helpers.c
+    Helpers/Input_helpers.c
 )
 
 # Build executable
