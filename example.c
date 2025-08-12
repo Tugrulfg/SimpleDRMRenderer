@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 #include <GLES2/gl2.h>
+#include <stdlib.h>
 
 #include "Helpers/Renderer_helpers.h"
 #include "Helpers/GL_helpers.h"
@@ -53,6 +54,9 @@ static float speed = 0.01;
 
 static void init() {
 	program = createProgram(vertexShaderSource, fragmentShaderSource);
+	if(!program){
+		exit(0); // Error creating program
+	}
 
 	positionAttrib = glGetAttribLocation(program, "a_Position");
 	colorUniform = glGetUniformLocation(program, "u_Color");
