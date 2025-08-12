@@ -1,4 +1,5 @@
 #include <stddef.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
@@ -24,7 +25,6 @@ static void set_raw_mode(int enable) {
 
 // Call this when you detect a key press/release
 static int renderer_invoke_key_event(int key) {
-	int ret;
 	if (g_key_cb) {
 		return g_key_cb(key);
 	}
@@ -74,9 +74,30 @@ int init_input_handler(key_event_cb key_cb, mouse_event_cb mouse_cb) {
 int process_inputs() {
 	int ret = 0;
 	if (g_key_cb) {
+		static char buf[3];
 		char ch;
-		ssize_t n = read(STDIN_FILENO, &ch, 1);
+		ssize_t n = read(STDIN_FILENO, &buf, 3);
 		if (n > 0) {
+			if (n == 3 && buf[0] == 27 && buf[1] == '[') {		// Handle arrow keys
+				switch (buf[2]) {
+				case 'A':
+					ch = 'w';
+					break;
+				case 'B':
+					ch = 's';
+					break;
+				case 'C':
+					ch = 'd';
+					break;
+				case 'D':
+					ch = 'a';
+					break;
+				}
+			}
+			else{
+				ch = buf[0];
+			}
+
 			ret = renderer_invoke_key_event(ch);
 		}
 	}

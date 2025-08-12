@@ -152,6 +152,9 @@ int keyboard_callback(int key){
 
 void mouse_callback(int x_move, int y_move, int left, int right, int middle){
 //	printf("Mouse: L=%d R=%d M=%d Move=(%d,%d)\n", left, right, middle, x_move, y_move);
+	(void)x_move;
+	(void)y_move;
+	(void)middle;
 	if (left) {
 		for (int i = 0; i < 9; i++)
 			vertices[i] *= 1.1;
