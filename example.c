@@ -1,17 +1,3 @@
-/*
- * main.c
- *
- *  Created on: Mar 2, 2025
- *      Author: tugrul
- */
-
-/*
- * main.c
- *
- *  Created on: Mar 2, 2025
- *      Author: tugrul
- */
-
 #include <stdio.h>
 #include <GLES2/gl2.h>
 #include <stdlib.h>
@@ -53,7 +39,8 @@ static int dir = 0;
 static float speed = 0.01;
 
 static void init() {
-	program = createProgram(vertexShaderSource, fragmentShaderSource);
+//	program = createProgram(vertexShaderSource, fragmentShaderSource);
+	program = createProgramFromFile("./Shaders/triangle.vert", "./Shaders/triangle.frag");
 	if(!program){
 		exit(0); // Error creating program
 	}

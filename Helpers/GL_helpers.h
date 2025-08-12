@@ -24,4 +24,6 @@
 
 unsigned int createProgram(const char *vertexSource, const char *fragmentSource);
 
+unsigned int createProgramFromFile(const char *vertexSourceFile, const char *fragmentSourceFile);
+
 #endif /* HELPERS_GL_HELPERS_H_ */

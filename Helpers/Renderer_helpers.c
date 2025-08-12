@@ -1,10 +1,3 @@
-/*
- * render_utils.c
- *
- *  Created on: Mar 8, 2025
- *      Author: tugrul
- */
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
