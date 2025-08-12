@@ -40,7 +40,7 @@ static float speed = 0.05;
 
 static void init() {
 //	program = createProgram(vertexShaderSource, fragmentShaderSource);
-	program = createProgramFromFile("./Shaders/triangle.vert", "./Shaders/triangle.frag");
+	program = createProgramFromFile("../Shaders/triangle.vert", "../Shaders/triangle.frag");
 	if(!program){
 		exit(0); // Error creating program
 	}
