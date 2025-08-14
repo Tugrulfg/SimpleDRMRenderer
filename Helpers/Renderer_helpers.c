@@ -9,7 +9,11 @@
 #include <GLES2/gl2.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include <string.h>
 #include "Renderer_helpers.h"
+
+extern int process_inputs();
+extern int createProgram(const char *vertexSource, const char *fragmentSource);
 
 static struct internal_device{
     unsigned int width, height;
@@ -43,23 +47,162 @@ static struct internal_device{
 
 static struct internal_device *dev = NULL;
 
-extern int process_inputs();
-unsigned int renderer_get_width(){
-	if(!dev){
-		printf("Renderer Error: Renderer haven't been initialized\n");
-		return 0;
-	}
+static GLuint text_program, text_texture;
+static GLint text_pos_attrib, text_uv_attrib, text_color_uniform, text_tex_uniform;
+static GLint text_proj_uniform;
 
-	return dev->width;
+// Simple orthographic projection (NDC)
+static float ortho_proj[16] = {
+    2.0f/800, 0, 0, 0,
+    0, -2.0f/600, 0, 0,
+    0, 0, -1, 0,
+   -1, 1, 0, 1
+};
+
+static const unsigned char digits_font[10][8] = {
+    {0x3C,0x66,0x6E,0x76,0x66,0x66,0x3C,0x00}, // 0
+    {0x18,0x38,0x18,0x18,0x18,0x18,0x7E,0x00}, // 1
+    {0x3C,0x66,0x06,0x0C,0x18,0x30,0x7E,0x00}, // 2
+    {0x3C,0x66,0x06,0x1C,0x06,0x66,0x3C,0x00}, // 3
+    {0x0C,0x1C,0x3C,0x6C,0x7E,0x0C,0x1E,0x00}, // 4
+    {0x7E,0x60,0x7C,0x06,0x06,0x66,0x3C,0x00}, // 5
+    {0x1C,0x30,0x60,0x7C,0x66,0x66,0x3C,0x00}, // 6
+    {0x7E,0x66,0x0C,0x18,0x18,0x18,0x18,0x00}, // 7
+    {0x3C,0x66,0x66,0x3C,0x66,0x66,0x3C,0x00}, // 8
+    {0x3C,0x66,0x66,0x3E,0x06,0x0C,0x38,0x00}  // 9
+};
+
+static int init_fps_renderer() {
+    const char* vertex_shader =
+        "attribute vec4 a_Position;"
+        "attribute vec2 a_TexCoord;"
+        "uniform mat4 u_Proj;"
+        "varying vec2 v_TexCoord;"
+        "void main() { "
+        "    v_TexCoord = a_TexCoord; "
+        "    gl_Position = u_Proj * a_Position; "
+        "}";
+
+    const char* fragment_shader =
+        "precision mediump float;"
+        "uniform sampler2D u_Texture;"
+        "uniform vec4 u_Color;"
+        "varying vec2 v_TexCoord;"
+        "void main() { "
+        "    float alpha = texture2D(u_Texture, v_TexCoord).a;"
+        "    gl_FragColor = vec4(u_Color.rgb, alpha * u_Color.a); "
+        "}";
+
+    // Update projection matrix for current screen size
+    ortho_proj[0] = 2.0f / dev->width;
+    ortho_proj[5] = -2.0f / dev->height;
+
+    text_program = createProgram(vertex_shader, fragment_shader);
+    if (text_program == 0) {
+        printf("Renderer Error: Failed to create shader program\n");
+        return 1;
+    }
+
+    text_pos_attrib = glGetAttribLocation(text_program, "a_Position");
+    text_uv_attrib = glGetAttribLocation(text_program, "a_TexCoord");
+    text_color_uniform = glGetUniformLocation(text_program, "u_Color");
+    text_tex_uniform = glGetUniformLocation(text_program, "u_Texture");
+    text_proj_uniform = glGetUniformLocation(text_program, "u_Proj");
+
+    // Create font texture - 10 digits in a row, each 8x8 pixels
+    glGenTextures(1, &text_texture);
+    glBindTexture(GL_TEXTURE_2D, text_texture);
+
+    // Create 80x8 texture (10 digits × 8 pixels wide, 8 pixels tall)
+    unsigned char font_data[80 * 8];
+    memset(font_data, 0, sizeof(font_data));
+
+    for(int digit = 0; digit < 10; digit++) {
+        for(int y = 0; y < 8; y++) {
+            for(int x = 0; x < 8; x++) {
+                int pixel_index = y * 80 + (digit * 8 + x); // Row-major order in 80x8 texture
+                font_data[pixel_index] = (digits_font[digit][y] & (1 << (7-x))) ? 255 : 0;
+            }
+        }
+    }
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, 80, 8, 0, GL_ALPHA, GL_UNSIGNED_BYTE, font_data);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    return 0;
 }
 
-unsigned int renderer_get_height(){
-	if (!dev) {
-		printf("Renderer Error: Renderer haven't been initialized\n");
-		return 0;
-	}
+static void draw_fps_number(int number, float x, float y, float scale) {
+    if (number < 0) return;
 
-	return dev->height;
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d", number);
+
+    glViewport(0, 0, dev->width, dev->height);
+    glUseProgram(text_program);
+
+    // Set uniforms
+    glUniformMatrix4fv(text_proj_uniform, 1, GL_FALSE, ortho_proj);
+    glUniform4f(text_color_uniform, 1.0f, 1.0f, 0.0f, 1.0f); // Yellow color
+
+    // Bind texture
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, text_texture);
+    glUniform1i(text_tex_uniform, 0);
+
+    // Enable blending for alpha
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+    float cx = x;
+    for(int i = 0; buf[i]; i++) {
+        int digit = buf[i] - '0';
+        if (digit < 0 || digit > 9) continue;
+
+        // Calculate texture coordinates for this digit
+        float tex_left = digit / 10.0f;     // Each digit is 1/10th of texture width
+        float tex_right = (digit + 1) / 10.0f;
+        float tex_top = 0.0f;
+        float tex_bottom = 1.0f;
+
+        // Vertex data: position (x,y) + texture coords (u,v)
+        float vertices[] = {
+            // Triangle 1
+            cx, y, tex_left, tex_top,                    // Top-left
+            cx + 8*scale, y, tex_right, tex_top,         // Top-right
+            cx, y + 8*scale, tex_left, tex_bottom,       // Bottom-left
+
+            // Triangle 2
+            cx + 8*scale, y, tex_right, tex_top,         // Top-right
+            cx + 8*scale, y + 8*scale, tex_right, tex_bottom, // Bottom-right
+            cx, y + 8*scale, tex_left, tex_bottom        // Bottom-left
+        };
+
+        // Set vertex attributes
+        glVertexAttribPointer(text_pos_attrib, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), vertices);
+        glEnableVertexAttribArray(text_pos_attrib);
+
+        glVertexAttribPointer(text_uv_attrib, 2, GL_FLOAT, GL_FALSE, 4*sizeof(float), vertices + 2);
+        glEnableVertexAttribArray(text_uv_attrib);
+
+        // Draw the character
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+
+        // Move to next character position
+        cx += 8*scale + 2;
+    }
+
+    // Disable vertex arrays
+    glDisableVertexAttribArray(text_pos_attrib);
+    glDisableVertexAttribArray(text_uv_attrib);
+
+    glDisable(GL_BLEND);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glUseProgram(0);
 }
 
 static int init_drm(){
@@ -332,16 +475,14 @@ static void update_fps() {
     // Increment frame count
     frame_count++;
 
-    // If 1 second has passed, update the FPS
-    if (time_diff >= 1.0f) {
+    // If 0.5 second has passed, update the FPS
+    if (time_diff >= 0.5f) {
         fps = frame_count / time_diff;
-        if(fps > 0.000001)					// Skip first frame calculation which results 0 FPS
-        	printf("FPS: %.2f\n\r", fps);
-
         // Reset for the next second
         frame_count = 0;
         last_time = current_time;
     }
+	draw_fps_number((int)fps, 10, 10, 3.0f);
 }
 
 int init_renderer(func_t init_f, func_t draw_f, func_t clean_f){
@@ -390,6 +531,16 @@ int init_renderer(func_t init_f, func_t draw_f, func_t clean_f){
 		return ret;
 	}
 
+    ret = init_fps_renderer();
+	if(ret){
+		free_egl();
+		free_gbm();
+		free_drm();
+		free(dev);
+		dev = NULL;
+		return ret;
+	}
+
 	dev->init = init_f;
 	dev->draw = draw_f;
 	dev->clean = clean_f;
@@ -414,13 +565,31 @@ int render_loop(){
 		if(process_inputs())
 			break;
 		dev->draw();
+		update_fps();
 		if(swap_buffers()){
 			return 1;
 		}
-		update_fps();
 	}
 
 	return 0;
+}
+
+unsigned int renderer_get_width(){
+	if(!dev){
+		printf("Renderer Error: Renderer haven't been initialized\n");
+		return 0;
+	}
+
+	return dev->width;
+}
+
+unsigned int renderer_get_height(){
+	if (!dev) {
+		printf("Renderer Error: Renderer haven't been initialized\n");
+		return 0;
+	}
+
+	return dev->height;
 }
 
 void free_renderer(){
@@ -435,8 +604,19 @@ void free_renderer(){
 	if(dev->previous_bo)
 		gbm_surface_release_buffer(dev->gbm_surface, dev->previous_bo);
 
-	if(dev->clean)
+	if (dev->clean)
 		dev->clean();
+
+	if (text_texture) {
+		glDeleteTextures(1, &text_texture);
+		text_texture = 0;
+	}
+
+	if (text_program) {
+		glDeleteProgram(text_program);
+		text_program = 0;
+	}
+
 	free_egl();
 	free_gbm();
 	free_drm();
