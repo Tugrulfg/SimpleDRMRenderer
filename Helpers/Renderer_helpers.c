@@ -336,7 +336,7 @@ static void update_fps() {
     if (time_diff >= 1.0f) {
         fps = frame_count / time_diff;
         if(fps > 0.000001)					// Skip first frame calculation which results 0 FPS
-        	printf("FPS: %.2f\n", fps);
+        	printf("FPS: %.2f\n\r", fps);
 
         // Reset for the next second
         frame_count = 0;

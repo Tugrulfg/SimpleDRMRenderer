@@ -55,64 +55,61 @@ static void init() {
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
 
-static void update_vertices(int key) {
+static void update_vertices() {
 	float diff = 0;
-	switch(key){
-	case 'w':
-		if (vertices[1]+speed < 1.0){
+	bool modified = false;
+	if (is_key_pressed(KEY_W)) {
+		if (vertices[1] + speed < 1.0) {
 			diff = speed;
-		}
-		else{
+		} else {
 			diff = 1.0 - vertices[1];
 		}
 		vertices[1] += diff;
 		vertices[4] += diff;
 		vertices[7] += diff;
-		break;
-	case 's':
-		if (vertices[7]-speed > -1.0){
+		modified = true;
+	}
+	if (is_key_pressed(KEY_S)) {
+		if (vertices[7] - speed > -1.0) {
 			diff = speed;
-		}
-		else{
+		} else {
 			diff = vertices[7] + 1;
 		}
 		vertices[1] -= diff;
 		vertices[4] -= diff;
 		vertices[7] -= diff;
-		break;
-	case 'a':
-		if (vertices[3]-speed > -1.0){
+		modified = true;
+	}
+	if (is_key_pressed(KEY_A)) {
+		if (vertices[3] - speed > -1.0) {
 			diff = speed;
-		}
-		else{
+		} else {
 			diff = vertices[3] + 1;
 		}
 
 		vertices[0] -= diff;
 		vertices[3] -= diff;
 		vertices[6] -= diff;
-		break;
-	case 'd':
-		if (vertices[6]+speed < 1.0){
+		modified = true;
+	}
+	if (is_key_pressed(KEY_D)) {
+		if (vertices[6] + speed < 1.0) {
 			diff = speed;
-		}
-		else{
+		} else {
 			diff = 1 - vertices[6];
 		}
 		vertices[0] += diff;
 		vertices[3] += diff;
 		vertices[6] += diff;
-
-		break;
-	default:
-		printf("Unknown key: %c: %d\n", key, key);
-		return;
+		modified = true;
 	}
 
-	// Update vertex buffer data
-	glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
-	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	if(modified){
+		// Update vertex buffer data
+		glBindBuffer(GL_ARRAY_BUFFER, vbo);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+	}
 }
 
 static void draw() {
@@ -142,15 +139,15 @@ static void cleanup() {
     glDeleteProgram(program);
 }
 
-int keyboard_callback(int key){
-	if(key == 27)
+static int keyboard_callback(){
+	if(is_key_pressed(KEY_ESC))
 		return 1;
 
-    update_vertices(key);
+    update_vertices();
 	return 0;
 }
 
-void mouse_callback(int x_move, int y_move, int left, int right, int middle){
+static void mouse_callback(int x_move, int y_move, int left, int right, int middle){
 //	printf("Mouse: L=%d R=%d M=%d Move=(%d,%d)\n", left, right, middle, x_move, y_move);
 	(void)x_move;
 	(void)y_move;
@@ -172,12 +169,17 @@ void mouse_callback(int x_move, int y_move, int left, int right, int middle){
 
 int main() {
 	init_renderer(init, draw, cleanup);
-	init_input_handler(keyboard_callback, mouse_callback);
+	if(init_input_handler(keyboard_callback, mouse_callback)){
+		free_renderer();
+		return 1;
+	}
 
 	if (render_loop()) {
 		// Error
 		free_renderer();
 		free_input_handler();
+
+		return 1;
 	} else {
 		// Success
 		free_renderer();
